@@ -171,8 +171,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <input id="q" class="grow" placeholder="Cari nama, barcode, atau kategori…" autocomplete="off">
       <button class="btn primary" id="btnNew" type="button">+ Barang baru</button>
       <button class="btn" id="btnImpCsv" type="button">Impor CSV</button>
+      <button class="btn" id="btnImpXlsx" type="button">Impor Excel (.xlsx)</button>
       <button class="btn" id="btnExpCsv" type="button">Ekspor CSV</button>
       <input type="file" id="fileCsv" accept=".csv,text/csv,text/plain" hidden>
+      <input type="file" id="fileXlsx" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
     </div>
     <p class="muted" id="prodCount" style="margin:10px 0 0"></p>
     <div class="scroll"><table class="tbl"><thead><tr><th>Barcode</th><th>Nama</th><th>Kategori</th><th class="n">Harga jual</th><th class="n">Stok</th><th></th></tr></thead><tbody id="prodBody"></tbody></table></div>
@@ -668,6 +670,150 @@ $("#fileCsv").addEventListener("change",async e=>{
   for(const it of items){const old=exist.get(it.barcode);if(old){it.id=old.id;upd++}else add++;s.put(it);exist.set(it.barcode,it)}
   try{await txDone(t)}catch(err){return toast("Impor gagal: "+err.message)}
   await loadAll();renderProducts();toast(`Impor selesai: ${add} baru, ${upd} diperbarui, ${skip} dilewati`);
+});
+
+/* ---------- impor excel (.xlsx) ---------- */
+/* Parser xlsx sederhana tanpa library eksternal: baca ZIP → sharedStrings + sheet → rows */
+async function parseXlsx(file){
+  const ab=await file.arrayBuffer();
+  const zip=await unzipAll(ab);
+  // shared strings
+  const ssXml=zip['xl/sharedStrings.xml'];
+  const strings=[];
+  if(ssXml){
+    const doc=new DOMParser().parseFromString(ssXml,'application/xml');
+    for(const si of doc.querySelectorAll('si')){
+      strings.push([...si.querySelectorAll('t')].map(t=>t.textContent).join(''));
+    }
+  }
+  // sheet (ambil sheet pertama)
+  const sheetKey=Object.keys(zip).find(k=>/xl\/worksheets\/sheet\d*\.xml/.test(k));
+  if(!sheetKey)throw new Error('Sheet tidak ditemukan');
+  const shDoc=new DOMParser().parseFromString(zip[sheetKey],'application/xml');
+  const rows=[];
+  for(const row of shDoc.querySelectorAll('row')){
+    const cells=[];
+    for(const c of row.querySelectorAll('c')){
+      const t=c.getAttribute('t');
+      const v=c.querySelector('v');
+      if(v){cells.push(t==='s'?strings[+v.textContent]:v.textContent);}
+      else{cells.push('');}
+    }
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/* Unzip minimal: inflate stored + deflated entries */
+async function unzipAll(ab){
+  const view=new DataView(ab);
+  const files={};
+  let offset=0;
+  const buf=new Uint8Array(ab);
+  while(offset<buf.length-4){
+    const sig=view.getUint32(offset,true);
+    if(sig===0x04034b50){
+      const flags=view.getUint16(offset+6,true);
+      const comp=view.getUint16(offset+8,true);
+      const compSize=view.getUint32(offset+18,true);
+      const nameLen=view.getUint16(offset+26,true);
+      const extraLen=view.getUint16(offset+28,true);
+      const name=new TextDecoder().decode(buf.slice(offset+30,offset+30+nameLen));
+      const dataStart=offset+30+nameLen+extraLen;
+      const data=buf.slice(dataStart,dataStart+compSize);
+      if(comp===0){
+        files[name]=new TextDecoder().decode(data);
+      }else if(comp===8){
+        try{
+          const ds=new DecompressionStream('deflate-raw');
+          const w=ds.writable.getWriter();
+          w.write(data);w.close();
+          const chunks=[];let size=0;
+          for await(const chunk of ds.readable){chunks.push(chunk);size+=chunk.length;}
+          const out=new Uint8Array(size);let pos=0;
+          for(const ch of chunks){out.set(ch,pos);pos+=ch.length;}
+          files[name]=new TextDecoder().decode(out);
+        }catch(e){}
+      }
+      offset=dataStart+compSize;
+    }else{offset++;}
+  }
+  return files;
+}
+
+/* Deteksi baris header dan kolom dari file Yasmira Mart */
+function detectXlsxColumns(rows){
+  // cari baris yang ada 'Kode Item' atau 'Nama Item'
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    const joined=r.join('|').toLowerCase();
+    if(joined.includes('kode item')||joined.includes('nama item')){
+      return {headerRow:i,rows};
+    }
+  }
+  return {headerRow:-1,rows};
+}
+
+$(\"#btnImpXlsx\").addEventListener('click',()=>{
+  alert('Format Excel yang didukung: file ekspor dari Yasmira Mart\\n\\nKolom yang dibaca:\\n• Kode Item → Barcode\\n• Nama Item → Nama\\n• Jenis → Kategori\\n• Stok → Stok\\n• Satuan → Satuan\\n• Harga Pokok → Harga beli\\n• Harga Jual → Harga jual\\n\\nBarang sudah ada (kode sama) akan diperbarui.');
+  $(\"#fileXlsx\").click();
+});
+
+$(\"#fileXlsx\").addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  toast('Membaca file Excel…');
+  let rows;
+  try{rows=await parseXlsx(f);}
+  catch(err){return toast('Gagal baca Excel: '+err.message);}
+  const {headerRow}=detectXlsxColumns(rows);
+  // jika header ditemukan, mapping otomatis; jika tidak, asumsikan kolom standar
+  let iKode=3,iNama=4,iJenis=8,iStok=10,iSatuan=11,iPokok=13,iJual=14;
+  if(headerRow>=0){
+    const h=rows[headerRow];
+    h.forEach((col,idx)=>{
+      const c=(col||'').toLowerCase().replace(/\s+/g,'');
+      if(c.includes('kodeitem')||c==='kode')iKode=idx;
+      else if(c.includes('namaitem')||c==='nama')iNama=idx;
+      else if(c.includes('jenis')||c==='kategori')iJenis=idx;
+      else if(c==='stok'||c.includes('stok'))iStok=idx;
+      else if(c==='satuan')iSatuan=idx;
+      else if(c.includes('pokok')||c.includes('beli'))iPokok=idx;
+      else if(c.includes('jual'))iJual=idx;
+    });
+  }
+  const dataRows=rows.slice(headerRow>=0?headerRow+1:0);
+  let add=0,upd=0,skip=0;
+  const items=[];
+  for(const r of dataRows){
+    const nama=(r[iNama]||'').trim();
+    if(!nama){skip++;continue;}
+    let code=(r[iKode]||'').trim();
+    if(!code)code=await nextInternalCode();
+    items.push({
+      barcode:code,
+      nama:nama,
+      kategori:(r[iJenis]||'').trim(),
+      beli:num(r[iPokok]),
+      jual:num(r[iJual]),
+      stok:num(r[iStok]),
+      min:0,
+      satuan:(r[iSatuan]||'pcs').trim(),
+      g1:null,g2:null,
+      u:Date.now()
+    });
+  }
+  if(!items.length)return toast('Tidak ada data valid ditemukan di file Excel');
+  const exist=new Map(byCode);
+  const t=db.transaction('products','readwrite'),s=t.objectStore('products');
+  for(const it of items){
+    const old=exist.get(it.barcode);
+    if(old){it.id=old.id;upd++;}else{add++;}
+    s.put(it);
+    exist.set(it.barcode,it);
+  }
+  try{await txDone(t);}catch(err){return toast('Impor gagal: '+err.message);}
+  await loadAll();renderProducts();
+  toast(`✅ Impor Excel selesai: ${add} baru, ${upd} diperbarui, ${skip} dilewati`);
 });
 
 /* ---------- label ---------- */
