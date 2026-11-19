@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Yasmira Mart</title>
+<title>aishieruku</title>
 <meta name="theme-color" content="#0a6a5c">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Yasmira Mart">
+<meta name="apple-mobile-web-app-title" content="aishieruku">
 <style>
 /* Tata letak: header + tab, area kerja satu kolom di ponsel, dua kolom di kasir pada layar lebar */
 :root{
@@ -112,7 +112,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <header>
   <div class="wrap">
     <div class="top">
-      <div class="brand"><span id="storeName">Yasmira Mart</span><small>Kasir &amp; stok barcode · tanpa batas jumlah barang</small></div>
+      <div class="brand"><span id="storeName">aishieruku</span><small>Kasir &amp; stok barcode · tanpa batas jumlah barang</small></div>
       <div class="muted" id="storageInfo" style="font-size:12px"></div>
     </div>
     <nav role="tablist" id="tabs">
@@ -394,7 +394,7 @@ const txDone=t=>new Promise((res,rej)=>{t.oncomplete=res;t.onerror=()=>rej(t.err
 async function loadAll(){
   P=await getAll("products");byCode=new Map(P.map(p=>[p.barcode,p]));byId=new Map(P.map(p=>[p.id,p]));C=await getAll("customers");
   settings=Object.fromEntries((await getAll("meta")).map(x=>[x.k,x.v]));
-  $("#storeName").textContent=settings.name||"Yasmira Mart";
+  $("#storeName").textContent=settings.name||"aishieruku";
   fillCust();
 }
 async function setMeta(k,v){await putRow("meta",{k,v});settings[k]=v}
@@ -498,7 +498,7 @@ async function checkout(print){
 $("#btnPay").addEventListener("click",()=>checkout(true));
 $("#btnPayNo").addEventListener("click",()=>checkout(false));
 function printReceipt(s){
-  $("#receipt").innerHTML=`<div style="text-align:center"><b>${esc(settings.name||"Yasmira Mart")}</b><br>${fmtT(s.t)}${s.custName?"<br>"+esc(s.custName):""}</div><hr>`+
+  $("#receipt").innerHTML=`<div style="text-align:center"><b>${esc(settings.name||"aishieruku")}</b><br>${fmtT(s.t)}${s.custName?"<br>"+esc(s.custName):""}</div><hr>`+
    s.items.map(i=>`<div>${esc(i.name)}</div><div class="r"><span>${i.qty} x ${Math.round(i.price).toLocaleString("id-ID")}</span><span>${Math.round(i.price*i.qty).toLocaleString("id-ID")}</span></div>`).join("")+
    `<hr><div class="r"><span>Subtotal</span><span>${Math.round(s.sub).toLocaleString("id-ID")}</span></div>`+
    (s.disc?`<div class="r"><span>Diskon</span><span>-${Math.round(s.disc).toLocaleString("id-ID")}</span></div>`:"")+
@@ -741,7 +741,7 @@ async function unzipAll(ab){
   return files;
 }
 
-/* Deteksi baris header dan kolom dari file Yasmira Mart */
+/* Deteksi baris header dan kolom dari file aishieruku */
 function detectXlsxColumns(rows){
   // cari baris yang ada 'Kode Item' atau 'Nama Item'
   for(let i=0;i<rows.length;i++){
@@ -755,7 +755,7 @@ function detectXlsxColumns(rows){
 }
 
 $('#btnImpXlsx').addEventListener('click',()=>{
-  alert('Format Excel yang didukung: file ekspor dari Yasmira Mart\n\nKolom yang dibaca:\n• Kode Item → Barcode\n• Nama Item → Nama\n• Jenis → Kategori\n• Stok → Stok\n• Satuan → Satuan\n• Harga Pokok → Harga beli\n• Harga Jual → Harga jual\n\nBarang sudah ada (kode sama) akan diperbarui.');
+  alert('Format Excel yang didukung: file ekspor dari aishieruku\n\nKolom yang dibaca:\n• Kode Item → Barcode\n• Nama Item → Nama\n• Jenis → Kategori\n• Stok → Stok\n• Satuan → Satuan\n• Harga Pokok → Harga beli\n• Harga Jual → Harga jual\n\nBarang sudah ada (kode sama) akan diperbarui.');
   $('#fileXlsx').click();
 });
 
@@ -947,7 +947,7 @@ async function renderSettings(){
   $("#setName").value=settings.name||"";$("#setFoot").value=settings.foot||"";
   try{if(navigator.storage&&navigator.storage.estimate){const e=await navigator.storage.estimate();$("#storageInfo").textContent="Penyimpanan terpakai "+(e.usage/1048576).toFixed(1)+" MB dari "+Math.round(e.quota/1048576).toLocaleString("id-ID")+" MB"}}catch(e){}
 }
-$("#setSave").addEventListener("click",async()=>{await setMeta("name",$("#setName").value.trim());await setMeta("foot",$("#setFoot").value.trim());$("#storeName").textContent=settings.name||"Yasmira Mart";toast("Pengaturan tersimpan")});
+$("#setSave").addEventListener("click",async()=>{await setMeta("name",$("#setName").value.trim());await setMeta("foot",$("#setFoot").value.trim());$("#storeName").textContent=settings.name||"aishieruku";toast("Pengaturan tersimpan")});
 $("#bkExp").addEventListener("click",async()=>{
   const data={v:1,t:Date.now(),products:await getAll("products"),sales:await getAll("sales"),log:await getAll("log"),meta:await getAll("meta"),customers:await getAll("customers"),payments:await getAll("payments")};
   download("cadangan-yasmira-mart-"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(data),"application/json");
