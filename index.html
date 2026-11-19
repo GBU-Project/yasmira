@@ -754,12 +754,12 @@ function detectXlsxColumns(rows){
   return {headerRow:-1,rows};
 }
 
-$(\"#btnImpXlsx\").addEventListener('click',()=>{
-  alert('Format Excel yang didukung: file ekspor dari Yasmira Mart\\n\\nKolom yang dibaca:\\n• Kode Item → Barcode\\n• Nama Item → Nama\\n• Jenis → Kategori\\n• Stok → Stok\\n• Satuan → Satuan\\n• Harga Pokok → Harga beli\\n• Harga Jual → Harga jual\\n\\nBarang sudah ada (kode sama) akan diperbarui.');
-  $(\"#fileXlsx\").click();
+$('#btnImpXlsx').addEventListener('click',()=>{
+  alert('Format Excel yang didukung: file ekspor dari Yasmira Mart\n\nKolom yang dibaca:\n• Kode Item → Barcode\n• Nama Item → Nama\n• Jenis → Kategori\n• Stok → Stok\n• Satuan → Satuan\n• Harga Pokok → Harga beli\n• Harga Jual → Harga jual\n\nBarang sudah ada (kode sama) akan diperbarui.');
+  $('#fileXlsx').click();
 });
 
-$(\"#fileXlsx\").addEventListener('change',async e=>{
+$('#fileXlsx').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   toast('Membaca file Excel…');
   let rows;
